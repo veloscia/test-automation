@@ -1,186 +1,209 @@
-Here’s a detailed implementation plan and code structure for developing a test automation framework based on your requirements:
+Creating a Selenium framework from scratch for a beginner involves laying out a basic structure and explaining the essential components. Below is a simple guide to establish a Selenium framework in C# using NUnit, which will use a sample website for demonstration.
 
-### 1. Create the JSON Configuration File
+### Framework Structure
 
-Create a configuration file named `application.config` with the following structure:
+1. **Project Setup**:
+    - Create a new Class Library project in Visual Studio (let's call it `SeleniumFramework`).
+    - Add necessary NuGet packages:
+      - Selenium.WebDriver
+      - Selenium.WebDriver.ChromeDriver
+      - NUnit
+      - Newtonsoft.Json (for JSON configuration)
+  
+2. **Project Structure**: Create the following folders and files:
+    ```
+    SeleniumFramework
+    ├── Drivers
+    │   └── DriverManager.cs
+    ├── Pages
+    │   └── LoginPage.cs
+    ├── Tests
+    │   └── LoginTests.cs
+    ├── Config
+    │   └── application.config (JSON file)
+    ├── Base
+    │   └── BaseSetup.cs
+    └── SeleniumFramework.csproj
+    ```
+
+### 1. JSON Configuration File
+
+Create `application.config` in the `Config` folder:
 
 ```json
 {
-  "URL": "https://practicetestautomation.com/practice-test-login/",
-  "BrowserType": "Chrome",  // can be "Firefox" or "Edge"
-  "Headless": true
+    "URL": "https://practicetestautomation.com/practice-test-login/",
+    "BrowserType": "Chrome",
+    "Headless": false
 }
 ```
 
-### 2. Develop the BaseSetup Class
+### 2. BaseSetup Class
 
-The `BaseSetup` class will encapsulate setup and configuration logic.
+This class handles the setup of the WebDriver, configuration loading, and teardown methods.
 
 ```csharp
 using Newtonsoft.Json;
 using NUnit.Framework;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
-using OpenQA.Selenium.Edge;
-using OpenQA.Selenium.Firefox;
 using System.IO;
 
-public abstract class BaseSetup
+namespace SeleniumFramework.Base
 {
-    protected IWebDriver driver;
-    protected string Url { get; private set; }
-    protected string BrowserType { get; private set; }
-    protected bool Headless { get; private set; }
-
-    public BaseSetup()
+    public class BaseSetup
     {
-        ReadConfig();
-        InitializeDriver();
-    }
+        protected IWebDriver driver;
+        protected string Url { get; private set; }
+        protected string BrowserType { get; private set; }
+        protected bool Headless { get; private set; }
 
-    private void ReadConfig()
-    {
-        var config = File.ReadAllText("application.config");
-        dynamic jsonConfig = JsonConvert.DeserializeObject(config);
-        Url = jsonConfig.URL;
-        BrowserType = jsonConfig.BrowserType;
-        Headless = jsonConfig.Headless;
-    }
-
-    public virtual void Setup()
-    {
-        // Additional setup logic can go here
-    }
-
-    [SetUp]
-    public void InitSetup()
-    {
-        Setup();
-    }
-
-    [TearDown]
-    public void Cleanup()
-    {
-        driver.Quit();
-    }
-
-    private void InitializeDriver()
-    {
-        switch (BrowserType.ToLower())
+        public BaseSetup()
         {
-            case "chrome":
-                var chromeOptions = new ChromeOptions();
-                if (Headless)
-                    chromeOptions.AddArgument("--headless");
-                driver = new ChromeDriver(chromeOptions);
-                break;
-            case "firefox":
-                var firefoxOptions = new FirefoxOptions();
-                if (Headless)
-                    firefoxOptions.AddArgument("--headless");
-                driver = new FirefoxDriver(firefoxOptions);
-                break;
-            case "edge":
-                var edgeOptions = new EdgeOptions();
-                if (Headless)
-                    edgeOptions.AddArgument("--headless");
-                driver = new EdgeDriver(edgeOptions);
-                break;
-            default:
-                throw new NotSupportedException("Browser type not supported");
+            ReadConfig();
+            InitializeDriver();
+        }
+
+        private void ReadConfig()
+        {
+            var config = File.ReadAllText("Config/application.config");
+            dynamic jsonConfig = JsonConvert.DeserializeObject(config);
+            Url = jsonConfig.URL;
+            BrowserType = jsonConfig.BrowserType;
+            Headless = jsonConfig.Headless;
+        }
+
+        [SetUp]
+        public void InitSetup()
+        {
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
+            driver.Navigate().GoToUrl(Url);
+        }
+
+        [TearDown]
+        public void Cleanup()
+        {
+            driver.Quit();
+        }
+
+        private void InitializeDriver()
+        {
+            switch (BrowserType.ToLower())
+            {
+                case "chrome":
+                    var options = new ChromeOptions();
+                    if (Headless)
+                        options.AddArgument("--headless");
+                    driver = new ChromeDriver(options);
+                    break;
+                default:
+                    throw new NotSupportedException("Browser type not supported");
+            }
         }
     }
 }
 ```
 
-### 3. Create Page Object Model Classes
+### 3. LoginPage Class
 
-Create a class for the login page according to the Page Object Model (POM) design pattern. This class will encapsulate the elements on the login page.
+This class represents the Login Page and encapsulates the elements and actions available on that page.
 
 ```csharp
 using OpenQA.Selenium;
-using System;
 
-public class LoginPage
+namespace SeleniumFramework.Pages
 {
-    private IWebDriver driver;
-    private IWebElement UsernameField => driver.FindElement(By.Id("username"));
-    private IWebElement PasswordField => driver.FindElement(By.Id("password"));
-    private IWebElement LoginButton => driver.FindElement(By.CssSelector("button[type='submit']"));
-
-    public LoginPage(IWebDriver driver)
+    public class LoginPage
     {
-        this.driver = driver;
-    }
+        private IWebDriver driver;
 
-    public void NavigateToLoginPage(string url)
-    {
-        driver.Navigate().GoToUrl(url);
-    }
+        private IWebElement UsernameField => driver.FindElement(By.Id("username"));
+        private IWebElement PasswordField => driver.FindElement(By.Id("password"));
+        private IWebElement LoginButton => driver.FindElement(By.CssSelector("button[type='submit']"));
 
-    public void EnterUsername(string username)
-    {
-        UsernameField.SendKeys(username);
-    }
+        public LoginPage(IWebDriver driver)
+        {
+            this.driver = driver;
+        }
 
-    public void EnterPassword(string password)
-    {
-        PasswordField.SendKeys(password);
-    }
+        public void EnterUsername(string username)
+        {
+            UsernameField.SendKeys(username);
+        }
 
-    public void ClickLogin()
-    {
-        LoginButton.Click();
-    }
-}
+        public void EnterPassword(string password)
+        {
+            PasswordField.SendKeys(password);
+        }
 
-public interface ILoginPage
-{
-    void EnterUsername(string username);
-    void EnterPassword(string password);
-    void ClickLogin();
+        public void ClickLogin()
+        {
+            LoginButton.Click();
+        }
+    }
 }
 ```
 
-### 4. Implement NUnit Testing
+### 4. LoginTests Class
 
-Create a test class that conducts the login test using NUnit. It will utilize the `BaseSetup` class and `LoginPage`.
+This file contains the actual test cases leveraging the `BaseSetup` and `LoginPage`.
 
 ```csharp
 using NUnit.Framework;
+using SeleniumFramework.Pages;
 
-[TestFixture]
-public class LoginTests : BaseSetup
+namespace SeleniumFramework.Tests
 {
-    private LoginPage loginPage;
-
-    [SetUp]
-    public override void Setup()
+    [TestFixture]
+    public class LoginTests : BaseSetup
     {
-        base.Setup();
-        loginPage = new LoginPage(driver);
-        loginPage.NavigateToLoginPage(Url);
-    }
+        private LoginPage loginPage;
 
-    [Test]
-    public void TestLogin()
-    {
-        // Arrange
-        string username = "your_username"; // replace with valid username
-        string password = "your_password"; // replace with valid password
+        [SetUp]
+        public override void InitSetup()
+        {
+            base.InitSetup();
+            loginPage = new LoginPage(driver);
+        }
 
-        // Act
-        loginPage.EnterUsername(username);
-        loginPage.EnterPassword(password);
-        loginPage.ClickLogin();
+        [Test]
+        public void TestLogin()
+        {
+            // Arrange
+            string username = "demo"; // use valid test credentials
+            string password = "password"; // use valid test credentials
 
-        // Assert
-        // Add assertions to verify login success, e.g. checking URL or element presence
-        Assert.AreEqual("Expected URL or element", driver.Url); // replace with actual expected outcome
+            // Act
+            loginPage.EnterUsername(username);
+            loginPage.EnterPassword(password);
+            loginPage.ClickLogin();
+
+            // Assert
+            Assert.IsTrue(driver.Title.Contains("Practice Test Login"), "Login failed or title doesn't match");
+        }
     }
 }
 ```
 
 ### Summary
 
-This implementation includes a framework setup based on Selenium and C#, implementing Object-Oriented principles. It creates a JSON configuration file, utilizes a BaseSetup class for driver management, applies the Page Object Model for the login page, and conducts a login test using NUnit. Adjust the actual test and config values according to your settings.
+This basic Selenium framework:
+
+1. **Loader**: Reads from a JSON configuration to set up the environment.
+2. **Driver Management**: Handles WebDriver initiation and cleanup.
+3. **Page Object Model (POM)**: Encapsulates page-specific actions and elements.
+4. **Test Assertions**: Uses NUnit for structuring tests and asserts.
+
+### Running the Tests
+
+1. Open Test Explorer in Visual Studio and run the `LoginTests`.
+2. Ensure ChromeDriver is compatible with your installed Chrome browser version.
+
+### Additional Enhancements
+
+- Implement additional page classes for other areas of your application as needed.
+- Add robust exception handling and logging.
+- Implement a reporting mechanism to log the results of your tests.
+- Explore Advanced features like page navigation, waiting strategies, and handling dropdowns, modals, etc. 
+
+This framework aims to provide you with a solid starting point for building more complex scenarios as you gain more experience with Selenium testing.
